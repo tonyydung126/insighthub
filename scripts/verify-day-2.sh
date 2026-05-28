@@ -12,19 +12,66 @@ echo "=== InsightHub — Verify Day 2 (MCP) ==="
 
 # .mcp.json valid + ≥4 servers
 if [ -f .mcp.json ]; then
-  if jq empty .mcp.json 2>/dev/null; then
+  if command -v jq >/dev/null 2>&1; then
+    JSON_OK=$(jq empty .mcp.json >/dev/null 2>&1 && echo yes || true)
+  else
+    JSON_OK=$(python3 - <<'PY'
+import json
+try:
+    json.load(open('.mcp.json'))
+    print('yes')
+except Exception:
+    pass
+PY
+  )
+  fi
+
+  if [ "$JSON_OK" = "yes" ]; then
     ok ".mcp.json valid JSON"
-    COUNT=$(jq '.mcpServers | length' .mcp.json)
+
+    if command -v jq >/dev/null 2>&1; then
+      COUNT=$(jq '.mcpServers | length' .mcp.json)
+    else
+      COUNT=$(python3 - <<'PY'
+import json
+data=json.load(open('.mcp.json'))
+print(len(data.get('mcpServers', {})))
+PY
+    )
+    fi
+
     if [ "$COUNT" -ge 4 ]; then
       ok ".mcp.json có $COUNT MCP server (≥4)"
     else
       ng ".mcp.json chỉ có $COUNT server (cần ≥4)"
     fi
-    # Check versions pinned
-    if jq -r '.mcpServers[].args[]?' .mcp.json | grep -qE '@latest|@main' ; then
-      ng "Có server dùng @latest hoặc @main (KHÔNG pin version)"
+
+    if command -v jq >/dev/null 2>&1; then
+      if jq -r '.mcpServers[].args[]?' .mcp.json | grep -qE '@latest|@main' ; then
+        ng "Có server dùng @latest hoặc @main (KHÔNG pin version)"
+      else
+        ok "Tất cả MCP server version pinned"
+      fi
     else
-      ok "Tất cả MCP server version pinned"
+      if python3 - <<'PY'
+import json, re
+data=json.load(open('.mcp.json'))
+ok = True
+for server in data.get('mcpServers', {}).values():
+    for arg in server.get('args', []):
+        if re.search(r'@latest|@main', arg):
+            ok = False
+            break
+    if not ok:
+        break
+if ok:
+    print('yes')
+PY
+      then
+        ok "Tất cả MCP server version pinned"
+      else
+        ng "Có server dùng @latest hoặc @main (KHÔNG pin version)"
+      fi
     fi
   else
     ng ".mcp.json không valid JSON"
@@ -51,13 +98,28 @@ fi
 
 # Allow-list check
 if [ -f .mcp.json ]; then
-  if jq -r '.mcpServers.filesystem.args[]?' .mcp.json 2>/dev/null | grep -qE '^/$|^\$HOME$|/home/[^/]+$' ; then
-    ng "Filesystem MCP allow-list quá rộng (root, $HOME)"
+  if command -v jq >/dev/null 2>&1; then
+    if jq -r '.mcpServers.filesystem.args[]?' .mcp.json 2>/dev/null | grep -qE '^/$|^\$HOME$|/home/[^/]+$' ; then
+      ng "Filesystem MCP allow-list quá rộng (root, $HOME)"
+    else
+      ok "Filesystem MCP allow-list hợp lý"
+    fi
   else
-    ok "Filesystem MCP allow-list hợp lý"
+    FILESYSTEM_ARGS=$(python3 - <<'PY'
+import json
+data=json.load(open('.mcp.json'))
+for arg in data.get('mcpServers', {}).get('filesystem', {}).get('args', []):
+    print(arg)
+PY
+)
+    if echo "$FILESYSTEM_ARGS" | grep -qE '^/$|^\$HOME$|/home/[^/]+$'; then
+      ng "Filesystem MCP allow-list quá rộng (root, $HOME)"
+    else
+      ok "Filesystem MCP allow-list hợp lý"
+    fi
   fi
 fi
 
 echo
-echo "=== Kết quả: $PASS PASS / $FAIL FAIL ==="
+ echo "=== Kết quả: $PASS PASS / $FAIL FAIL ==="
 [ "$FAIL" -eq 0 ] && green "✅ Day 2 OK" || { red "❌ Có FAIL — xem Day2-Spec.md"; exit 1; }
