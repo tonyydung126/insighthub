@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem@1.0.1",
+        "./"
+      ]
+    },
+    "docker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "docker-mcp-server@1.0.0"
+      ]
+    },
+    "kubernetes": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "kubernetes-mcp-server@1.0.0",
+        "--read-only"
+      ],
+      "env": {
+        "KUBECONFIG": "$HOME/.kube/mcp-viewer.kubeconfig"
+      }
+    },
+    "prometheus": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "prometheus-mcp-server@1.0.0",
+        "--target",
+        "http://localhost:9090"
+      ]
+    }
+  }
+}
