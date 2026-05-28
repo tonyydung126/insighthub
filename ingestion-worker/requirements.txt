@@ -1,0 +1,13 @@
+pydantic==2.10.4
+pydantic-settings==2.7.0
+psycopg[binary,pool]==3.2.3
+pgvector==0.3.6
+voyageai==0.3.2
+openai==1.59.9
+google-genai==0.3.0
+pypdf==5.1.0
+arq==0.26.3
+redis==5.2.1
+httpx==0.28.1
+tenacity==9.0.0
+python-dotenv==1.0.0
