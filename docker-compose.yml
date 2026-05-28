@@ -31,10 +31,26 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-insighthub}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-insighthub}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-insighthub}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   api:
     build: ./api
     environment:
       DATABASE_URL: postgresql://insighthub:insighthub@postgres:5432/insighthub
+      REDIS_URL: redis://:${REDIS_PASSWORD:-insighthub}@redis:6379/0
       # ---- LLM ----
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-1024}
@@ -63,6 +79,28 @@ services:
       - "8000:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  ingestion-worker:
+    build:
+      context: .
+      dockerfile: ingestion-worker/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://insighthub:insighthub@postgres:5432/insighthub
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-insighthub}
+      REDIS_DB: 0
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   web:
@@ -109,4 +147,6 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
   ollama-data:
+

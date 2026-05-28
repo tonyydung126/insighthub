@@ -48,13 +48,37 @@ fi
 
 # 4. Upload tài liệu mẫu
 echo "[4] Upload tài liệu mẫu..."
-UPLOAD=$(curl -sf -X POST "$API/documents" \
-  -F "file=@sample-docs/so-tay-van-hanh.md" 2>/dev/null)
-if echo "$UPLOAD" | grep -q '"status":"ready"'; then
-  green "    PASS — Upload + ingest thành công"
-  PASS=$((PASS+1))
+HTTP_CODE=$(curl -s -o /tmp/upload.json -w "%{http_code}" -X POST "$API/documents" \
+  -F "file=@sample-docs/so-tay-van-hanh.md" 2>/dev/null || echo "000")
+UPLOAD=$(cat /tmp/upload.json 2>/dev/null || true)
+if [ "$HTTP_CODE" = "202" ]; then
+  DOC_ID=$(python3 -c "import sys,json; d=json.load(open('/tmp/upload.json')); print(d.get('id',''))" 2>/dev/null || true)
+  STATUS=$(python3 -c "import sys,json; d=json.load(open('/tmp/upload.json')); print(d.get('status',''))" 2>/dev/null || true)
+  if [ -n "$DOC_ID" ] && [ "$STATUS" = "pending" ]; then
+    echo "    POST /documents → 202 Accepted, document id=$DOC_ID pending. Polling status..."
+    for i in 1 2 3 4 5 6; do
+      sleep 5
+      STATUS=$(curl -sf "$API/documents/status/$DOC_ID" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null || true)
+      if [ "$STATUS" = "ready" ]; then
+        green "    PASS — Upload + ingest thành công (document ready)"
+        PASS=$((PASS+1))
+        break
+      fi
+      echo "    Waiting for ready... ($((i*5))s)"
+    done
+    if [ "$STATUS" != "ready" ]; then
+      red "    FAIL — Document $DOC_ID không chuyển sang ready trong 30s. Response: $UPLOAD"
+      FAIL=$((FAIL+1))
+    fi
+  else
+    red "    FAIL — Upload không trả về document pending. Response: $UPLOAD"
+    FAIL=$((FAIL+1))
+  fi
+elif [ "$HTTP_CODE" = "201" ]; then
+  red "    FAIL — API vẫn trả 201 (sync upload), cần refactor async"
+  FAIL=$((FAIL+1))
 else
-  red "    FAIL — Upload lỗi. Response: $UPLOAD"
+  red "    FAIL — Upload lỗi. HTTP $HTTP_CODE. Response: $UPLOAD"
   FAIL=$((FAIL+1))
 fi
 
