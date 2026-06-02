@@ -58,10 +58,15 @@ fi
 
 # Check pipeline đã run
 if command -v gh >/dev/null 2>&1; then
-  if gh run list --limit 1 2>/dev/null | grep -q "completed.*success"; then
-    ok "Pipeline run gần nhất: success"
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+  if [ -n "$BRANCH" ]; then
+    if gh run list --workflow iac.yml --branch "$BRANCH" --limit 1 2>/dev/null | grep -q "completed.*success"; then
+      ok "Pipeline run gần nhất trên branch $BRANCH: success"
+    else
+      ng "Pipeline run gần nhất trên branch $BRANCH: không success (check gh run view)"
+    fi
   else
-    ng "Pipeline run gần nhất: không success (check gh run view)"
+    ng "Không xác định được branch Git để kiểm tra CI"
   fi
 fi
 
