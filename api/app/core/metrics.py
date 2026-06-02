@@ -45,6 +45,11 @@ documents_total = Gauge(
     ["status"],  # pending | ready | failed
 )
 
+ingestion_queue_depth = Gauge(
+    "insighthub_ingestion_queue_depth",
+    "Depth of the ingestion job queue for InsightHub",
+)
+
 ingestion_errors_total = Counter(
     "insighthub_ingestion_errors_total",
     "Số lần ingestion thất bại",

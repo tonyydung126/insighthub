@@ -1,0 +1,14 @@
+{
+  "incident_id": "db-error-001",
+  "summary": "Database connectivity errors caused ingestion failures.",
+  "top_hypotheses": [
+    {
+      "hypothesis": "DB connection issues caused ingestion jobs to fail and retry.",
+      "evidence": [
+        "insighthub_ingestion_errors_total increased",
+        "queue depth remained high while ready documents did not grow"
+      ]
+    }
+  ],
+  "recommendation": "Review database instance health, connection pooling, and transient error retry policy."
+}

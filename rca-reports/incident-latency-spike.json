@@ -1,0 +1,14 @@
+{
+  "incident_id": "latency-spike-001",
+  "summary": "LLM call latency spike impacted RAG query performance.",
+  "top_hypotheses": [
+    {
+      "hypothesis": "LLM latency increased due to slow external model response.",
+      "evidence": [
+        "insighthub_llm_call_latency_seconds p95 jumped from 1.2s to 12s",
+        "RAG query latency p95 increased concurrently"
+      ]
+    }
+  ],
+  "recommendation": "Investigate upstream LLM provider, enable circuit breaker or fallback model, and add alert on upper-band latency anomaly."
+}
