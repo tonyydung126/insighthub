@@ -21,29 +21,39 @@ provider "kubernetes" {
   config_path = var.kubeconfig_path
 }
 
-data "aws_default_vpc" "default" {}
+data "aws_vpc" "default" {
+  filter {
+    name   = "isDefault"
+    values = ["true"]
+  }
+}
 
-data "aws_default_subnet_ids" "default" {
-  vpc_id = data.aws_default_vpc.default.id
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
 }
 
 resource "aws_security_group" "db" {
   name        = "${var.namespace}-db-sg"
   description = "Security group for InsightHub Postgres"
-  vpc_id      = data.aws_default_vpc.default.id
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
+    description = "Allow Postgres traffic from within the VPC"
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = [data.aws_default_vpc.default.cidr_block]
+    cidr_blocks = [data.aws_vpc.default.cidr_block]
   }
 
   egress {
+    description = "Allow outbound traffic to other VPC resources"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [data.aws_vpc.default.cidr_block]
   }
 
   tags = {
@@ -54,20 +64,22 @@ resource "aws_security_group" "db" {
 resource "aws_security_group" "redis" {
   name        = "${var.namespace}-redis-sg"
   description = "Security group for InsightHub Redis"
-  vpc_id      = data.aws_default_vpc.default.id
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
+    description = "Allow Redis traffic from within the VPC"
     from_port   = 6379
     to_port     = 6379
     protocol    = "tcp"
-    cidr_blocks = [data.aws_default_vpc.default.cidr_block]
+    cidr_blocks = [data.aws_vpc.default.cidr_block]
   }
 
   egress {
+    description = "Allow outbound traffic to other VPC resources"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [data.aws_vpc.default.cidr_block]
   }
 
   tags = {
@@ -77,7 +89,7 @@ resource "aws_security_group" "redis" {
 
 resource "aws_db_subnet_group" "insighthub" {
   name       = "${var.namespace}-db-subnet-group"
-  subnet_ids = data.aws_default_subnet_ids.default.ids
+  subnet_ids = data.aws_subnets.default.ids
 
   tags = {
     Name = "${var.namespace}-db-subnet-group"
@@ -99,22 +111,52 @@ resource "aws_db_parameter_group" "insighthub" {
   }
 }
 
+resource "aws_iam_role" "rds_monitoring" {
+  name = "${var.namespace}-rds-monitoring-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "monitoring.rds.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "rds_monitoring" {
+  role       = aws_iam_role.rds_monitoring.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}
+
 resource "aws_db_instance" "insighthub" {
-  identifier                 = "${var.namespace}-db"
-  engine                     = "postgres"
-  engine_version             = "16"
-  instance_class             = "db.t4g.micro"
-  allocated_storage          = 20
-  storage_encrypted          = true
-  publicly_accessible        = false
-  db_subnet_group_name       = aws_db_subnet_group.insighthub.name
-  vpc_security_group_ids     = [aws_security_group.db.id]
-  username                   = var.postgres_username
-  password                   = var.postgres_password
-  skip_final_snapshot        = true
-  backup_retention_period    = 7
-  auto_minor_version_upgrade = true
-  parameter_group_name       = aws_db_parameter_group.insighthub.name
+  identifier                            = "${var.namespace}-db"
+  engine                                = "postgres"
+  engine_version                        = "16"
+  instance_class                        = "db.t4g.micro"
+  allocated_storage                     = 20
+  storage_encrypted                     = true
+  publicly_accessible                   = false
+  db_subnet_group_name                  = aws_db_subnet_group.insighthub.name
+  vpc_security_group_ids                = [aws_security_group.db.id]
+  username                              = var.postgres_username
+  password                              = var.postgres_password
+  skip_final_snapshot                   = true
+  backup_retention_period               = 7
+  auto_minor_version_upgrade            = true
+  parameter_group_name                  = aws_db_parameter_group.insighthub.name
+  deletion_protection                   = true
+  enabled_cloudwatch_logs_exports       = ["postgresql", "upgrade"]
+  iam_database_authentication_enabled   = true
+  monitoring_interval                   = 60
+  monitoring_role_arn                   = aws_iam_role.rds_monitoring.arn
+  multi_az                              = true
+  performance_insights_enabled          = true
+  performance_insights_retention_period = 7
 
   tags = {
     Name = "${var.namespace}-postgres"
@@ -123,7 +165,7 @@ resource "aws_db_instance" "insighthub" {
 
 resource "aws_elasticache_subnet_group" "insighthub" {
   name       = "${var.namespace}-redis-subnet-group"
-  subnet_ids = data.aws_default_subnet_ids.default.ids
+  subnet_ids = data.aws_subnets.default.ids
 
   tags = {
     Name = "${var.namespace}-redis-subnet-group"
@@ -140,7 +182,6 @@ resource "aws_elasticache_cluster" "insighthub" {
   security_group_ids         = [aws_security_group.redis.id]
   port                       = 6379
   transit_encryption_enabled = true
-  at_rest_encryption_enabled = true
 
   tags = {
     Name = "${var.namespace}-redis"
