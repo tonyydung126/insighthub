@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: insighthub-anomaly-rules
+  namespace: monitoring
+spec:
+  groups:
+    - name: insighthub-anomaly.rules
+      rules:
+        - record: insighthub_llm_call_latency_seconds_baseline
+          expr: avg_over_time(insighthub_llm_call_latency_seconds[1h])
+        - record: insighthub_llm_call_latency_seconds_stddev
+          expr: stddev_over_time(insighthub_llm_call_latency_seconds[1h])
+        - record: insighthub_llm_call_latency_seconds_upper_band
+          expr: insighthub_llm_call_latency_seconds_baseline + 3 * insighthub_llm_call_latency_seconds_stddev
+        - record: insighthub_llm_call_latency_seconds_lower_band
+          expr: insighthub_llm_call_latency_seconds_baseline - 3 * insighthub_llm_call_latency_seconds_stddev
+        - alert: InsightHubLLMLatencyAnomaly
+          expr: insighthub_llm_call_latency_seconds > insighthub_llm_call_latency_seconds_upper_band
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "InsightHub LLM latency anomaly detected"
+            description: "LLM latency is above the dynamic anomaly band for more than 5 minutes."

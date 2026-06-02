@@ -12,7 +12,7 @@ from arq.connections import RedisSettings, create_pool
 from fastapi import APIRouter, HTTPException, UploadFile
 
 from app.core.db import get_conn
-from app.core.metrics import documents_total, ingestion_errors_total
+from app.core.metrics import documents_total, ingestion_errors_total, ingestion_queue_depth
 # from app.services.ingestion import ingest_document_sync # Xóa dòng này
 
 logger = logging.getLogger("insighthub.routers.documents")
@@ -40,6 +40,13 @@ async def startup_event():
     global redis_pool
     redis_pool = await get_redis_pool()
     logger.info("Redis connection pool initialized for API.")
+    ingestion_queue_depth.set(0)
+    if redis_pool is not None:
+        try:
+            queue_len = await redis_pool.llen("arq:queue:ingest_document_job")
+            ingestion_queue_depth.set(queue_len)
+        except Exception:
+            ingestion_queue_depth.set(0)
 
 @router.on_event("shutdown")
 async def shutdown_event():
@@ -70,6 +77,11 @@ async def upload_document(file: UploadFile):
         if redis_pool is None:
             raise RuntimeError("Redis connection pool not initialized.")
         await redis_pool.enqueue_job('ingest_document_job', str(document_id), content, file.filename)
+        try:
+            queue_len = await redis_pool.llen("arq:queue:ingest_document_job")
+            ingestion_queue_depth.set(queue_len)
+        except Exception:
+            ingestion_queue_depth.set(0)
         logger.info(f"Enqueued ingestion job for document_id: {document_id}, file_name: {file.filename}")
     except Exception as exc:
         ingestion_errors_total.inc()

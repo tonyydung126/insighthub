@@ -1,0 +1,14 @@
+{
+  "incident_id": "queue-backlog-001",
+  "summary": "Ingestion queue backlog caused document processing delay.",
+  "top_hypotheses": [
+    {
+      "hypothesis": "Worker throughput dropped and queue depth accumulated.",
+      "evidence": [
+        "insighthub_ingestion_queue_depth increased above 100",
+        "documents_total{status=\"pending\"} rose sharply"
+      ]
+    }
+  ],
+  "recommendation": "Scale ingestion worker replicas, inspect ARQ worker logs, and tune retry/backoff settings."
+}
