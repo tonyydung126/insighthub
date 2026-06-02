@@ -44,7 +44,7 @@ docker compose logs -f api     # xem log api
 
 <!-- Học viên cập nhật theo tiến độ 7 ngày -->
 - [x] Day 1: tách ingestion-worker, thêm Redis
-- [ ] Day 2: cấu hình MCP servers
+- [x] Day 2: cấu hình MCP servers
 - [ ] Day 3: Terraform + CI/CD pipeline
 - [ ] Day 4: observability + anomaly detection
 - [ ] Day 5: ChatOps bot

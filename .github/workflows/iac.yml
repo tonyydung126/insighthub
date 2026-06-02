@@ -69,4 +69,8 @@ jobs:
       - name: Terraform plan
         run: |
           cd infra
+          if [ -z "${AWS_ACCESS_KEY_ID-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY-}" ] || [ ! -f "${KUBECONFIG:-$HOME/.kube/config}" ]; then
+            echo "Skipping terraform plan because AWS credentials or kubeconfig are not configured"
+            exit 0
+          fi
           terraform plan -out=tfplan
