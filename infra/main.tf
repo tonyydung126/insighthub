@@ -100,21 +100,21 @@ resource "aws_db_parameter_group" "insighthub" {
 }
 
 resource "aws_db_instance" "insighthub" {
-  identifier              = "${var.namespace}-db"
-  engine                  = "postgres"
-  engine_version          = "16"
-  instance_class          = "db.t4g.micro"
-  allocated_storage       = 20
-  storage_encrypted       = true
-  publicly_accessible     = false
-  db_subnet_group_name    = aws_db_subnet_group.insighthub.name
-  vpc_security_group_ids  = [aws_security_group.db.id]
-  username                = var.postgres_username
-  password                = var.postgres_password
-  skip_final_snapshot     = true
-  backup_retention_period = 7
+  identifier                 = "${var.namespace}-db"
+  engine                     = "postgres"
+  engine_version             = "16"
+  instance_class             = "db.t4g.micro"
+  allocated_storage          = 20
+  storage_encrypted          = true
+  publicly_accessible        = false
+  db_subnet_group_name       = aws_db_subnet_group.insighthub.name
+  vpc_security_group_ids     = [aws_security_group.db.id]
+  username                   = var.postgres_username
+  password                   = var.postgres_password
+  skip_final_snapshot        = true
+  backup_retention_period    = 7
   auto_minor_version_upgrade = true
-  parameter_group_name    = aws_db_parameter_group.insighthub.name
+  parameter_group_name       = aws_db_parameter_group.insighthub.name
 
   tags = {
     Name = "${var.namespace}-postgres"
@@ -131,14 +131,14 @@ resource "aws_elasticache_subnet_group" "insighthub" {
 }
 
 resource "aws_elasticache_cluster" "insighthub" {
-  cluster_id           = "${var.namespace}-redis"
-  engine               = "redis"
-  engine_version       = "7.0"
-  node_type            = "cache.t4g.micro"
-  num_cache_nodes      = 1
-  subnet_group_name    = aws_elasticache_subnet_group.insighthub.name
-  security_group_ids   = [aws_security_group.redis.id]
-  port                 = 6379
+  cluster_id                 = "${var.namespace}-redis"
+  engine                     = "redis"
+  engine_version             = "7.0"
+  node_type                  = "cache.t4g.micro"
+  num_cache_nodes            = 1
+  subnet_group_name          = aws_elasticache_subnet_group.insighthub.name
+  security_group_ids         = [aws_security_group.redis.id]
+  port                       = 6379
   transit_encryption_enabled = true
   at_rest_encryption_enabled = true
 
