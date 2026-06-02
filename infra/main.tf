@@ -133,6 +133,24 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
 
+resource "aws_kms_key" "rds_performance_insights" {
+  description             = "KMS key for RDS Performance Insights encryption"
+  deletion_window_in_days = 30
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "Enable IAM User Permissions"
+        Effect    = "Allow"
+        Principal = { AWS = "*" }
+        Action    = "kms:*"
+        Resource  = "*"
+      }
+    ]
+  })
+}
+
 resource "aws_db_instance" "insighthub" {
   identifier                            = "${var.namespace}-db"
   engine                                = "postgres"
@@ -156,7 +174,9 @@ resource "aws_db_instance" "insighthub" {
   monitoring_role_arn                   = aws_iam_role.rds_monitoring.arn
   multi_az                              = true
   performance_insights_enabled          = true
+  performance_insights_kms_key_id       = aws_kms_key.rds_performance_insights.arn
   performance_insights_retention_period = 7
+  copy_tags_to_snapshot                 = true
 
   tags = {
     Name = "${var.namespace}-postgres"
@@ -182,6 +202,7 @@ resource "aws_elasticache_cluster" "insighthub" {
   security_group_ids         = [aws_security_group.redis.id]
   port                       = 6379
   transit_encryption_enabled = true
+  snapshot_retention_limit   = 7
 
   tags = {
     Name = "${var.namespace}-redis"
