@@ -35,6 +35,8 @@ data "aws_subnets" "default" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
 resource "aws_security_group" "db" {
   name        = "${var.namespace}-db-sg"
   description = "Security group for InsightHub Postgres"
@@ -134,18 +136,33 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring" {
 }
 
 resource "aws_kms_key" "rds_performance_insights" {
-  description             = "KMS key for RDS Performance Insights encryption"
-  deletion_window_in_days = 30
+  description              = "KMS key for RDS Performance Insights encryption"
+  deletion_window_in_days  = 30
+  customer_master_key_spec = "SYMMETRIC_DEFAULT"
+  enable_key_rotation      = true
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "Enable IAM User Permissions"
+        Sid       = "Allow account administrators to manage the key"
         Effect    = "Allow"
-        Principal = { AWS = "*" }
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
         Action    = "kms:*"
         Resource  = "*"
+      },
+      {
+        Sid       = "Allow RDS to use the key for performance insights"
+        Effect    = "Allow"
+        Principal = { Service = "rds.amazonaws.com" }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
       }
     ]
   })
